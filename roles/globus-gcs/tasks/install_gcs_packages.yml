@@ -1,0 +1,19 @@
+---
+- name: install GCS RPM repository key
+  rpm_key:
+    key: https://downloads.globus.org/toolkit/gt6/stable/repo/rpm/RPM-GPG-KEY-Globus
+
+- name: install GCS repository
+  yum:
+    name: https://downloads.globus.org/toolkit/globus-connect-server/globus-connect-server-repo-latest.noarch.rpm
+    state: present
+
+- name: install the EPEL repository
+  yum:
+    name: https://dl.fedoraproject.org/pub/epel/epel-release-latest-7.noarch.rpm
+    state: present
+
+- name: install GCS packages
+  yum:
+    name: [ 'globus-connect-server', 'globus-gridftp-server-ceph']
+    state: present

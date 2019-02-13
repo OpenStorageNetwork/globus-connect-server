@@ -1,0 +1,22 @@
+if [ `hostname` == "citadel" ]
+then
+	for h in jhu-mon1   \
+	         jhu-mon2   \
+	         jhu-mon3   \
+	         nwu-mon1   \
+	         nwu-mon2   \
+	         nwu-mon3
+	do
+		scp -i ~/.ssh/osn-ansible reset $h:.
+		ssh -i ~/.ssh/osn-ansible $h sudo --login bash /home/ansible/reset
+	done
+	return 0
+fi
+
+yum remove -y globus*
+# Remove GCS RPM repository key
+rpm -e gpg-pubkey-faf24365-4d0f5d09
+userdel --remove globus-ceph
+userdel --remove myproxyoauth
+userdel --remove myproxy
+rm -rf /var/lib/globus-connect-server

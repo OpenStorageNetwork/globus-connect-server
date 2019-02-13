@@ -1,0 +1,6 @@
+---
+
+# This keeps ansible from complaining if no other variables are defined
+dummy:
+
+endpoint_name: nwu.osn

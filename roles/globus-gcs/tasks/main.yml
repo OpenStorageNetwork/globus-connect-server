@@ -1,0 +1,103 @@
+---
+- name: install GCS packages
+  become: yes
+  become_flags: --login
+  include: install_gcs_packages.yml
+
+- name: Setup CILogon for GCS
+  become: yes
+  lineinfile:
+    path: /etc/globus-connect-server.conf
+    insertafter: '[Security]'
+    regexp: '.*IdentityMethod =.*'
+    line: 'IdentityMethod = CILogon'
+
+- name: Setup Gridmap authorization for GCS
+  become: yes
+  lineinfile:
+    path: /etc/globus-connect-server.conf
+    insertafter: '[Security]'
+    regexp: '.*AuthorizationMethod =.*'
+    line: 'AuthorizationMethod = Gridmap'
+
+- name: Setup Gridmap CILogon IdP for GCS
+  become: yes
+  lineinfile:
+    path: /etc/globus-connect-server.conf
+    insertafter: '[Security]'
+    regexp: '.*CILogonIdentityProvider =.*'
+    line: 'CILogonIdentityProvider = University of Chicago'
+
+- name: Setup Globus Connect Server
+  become: yes
+  command: /usr/bin/globus-connect-server-setup
+  environment:
+    GLOBUS_USER: "{{ globus_id_user }}"
+    GLOBUS_PASSWORD: "{{ globus_id_pass }}"
+    SHORT_HOSTNAME: "{{ endpoint_name }}"
+  args:
+    creates: /var/lib/globus-connect-server/
+
+- name: Add globus-ceph service user
+  become: yes
+  user:
+    name: globus-ceph
+    comment: Globus Ceph
+    system: yes
+    password_lock: yes
+
+- name: Add gridftp radosgw account
+  become: yes
+  run_once: true
+  shell: radosgw-admin user create --uid=gridftp --display-name "GridFTP Ceph DSI" --caps="users=read"
+  register: rgw_output
+
+- name: set host_name in /etc/globus/globus-gridftp-server-ceph.conf
+  become: yes
+  lineinfile:
+    path: /etc/globus/globus-gridftp-server-ceph.conf
+    regexp: '.*host_name =.*'
+    line: "host_name = localhost:3000"
+
+- name: set use_https = false in /etc/globus/globus-gridftp-server-ceph.conf
+  become: yes
+  lineinfile:
+    path: /etc/globus/globus-gridftp-server-ceph.conf
+    regexp: '.*use_https =.*'
+    line: "use_https = false"
+
+- name: set admin_access_key in /etc/globus/globus-gridftp-server-ceph.conf
+  become: yes
+  vars:
+    key: "{{ (rgw_output.stdout | from_json)['keys'][0].access_key }}"
+  lineinfile:
+    path: /etc/globus/globus-gridftp-server-ceph.conf
+    regexp: '.*ceph_rgw_admin_access_key_id =.*'
+    line: "ceph_rgw_admin_access_key_id = {{ key }}"
+
+- name: set admin_secret_key in /etc/globus/globus-gridftp-server-ceph.conf
+  become: yes
+  vars:
+    key: "{{ (rgw_output.stdout | from_json)['keys'][0].secret_key }}"
+  lineinfile:
+    path: /etc/globus/globus-gridftp-server-ceph.conf
+    regexp: '.*ceph_rgw_admin_secret_access_key =.*'
+    line: "ceph_rgw_admin_secret_access_key = {{ key }}"
+
+- name: Edit /etc/gridftp.d/gridftp-ceph
+  become: yes
+  blockinfile:
+    path: /etc/gridftp.d/gridftp-ceph
+    create: yes
+    mode: 0644
+    block: |
+      threads 2
+      load_dsi_module ceph
+      process_user globus-ceph
+
+- name: Reload the GridFTP service
+  become: yes
+  service:
+    name: globus-gridftp-server
+    state: reloaded
+
