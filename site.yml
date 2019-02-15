@@ -1,5 +1,5 @@
 ---
-- hosts: ~.*-mon.*:&ceph
+- hosts: ~.*-mon1.*:&ceph
   roles:
   - globus-gcs
 

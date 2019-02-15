@@ -1,103 +1,153 @@
 ---
+
+# Set Firewall rules
 - name: install GCS packages
   become: yes
   become_flags: --login
   include: install_gcs_packages.yml
 
-- name: Setup CILogon for GCS
+- name: Set [Globus].ClientId
   become: yes
-  lineinfile:
-    path: /etc/globus-connect-server.conf
-    insertafter: '[Security]'
-    regexp: '.*IdentityMethod =.*'
-    line: 'IdentityMethod = CILogon'
+  ini_file:
+    dest: /etc/globus-connect-server.conf
+    section: Globus
+    option: ClientId
+    value: "{{ client_id }}"
 
-- name: Setup Gridmap authorization for GCS
+- name: Set [Globus].ClientSecret
   become: yes
-  lineinfile:
-    path: /etc/globus-connect-server.conf
-    insertafter: '[Security]'
-    regexp: '.*AuthorizationMethod =.*'
-    line: 'AuthorizationMethod = Gridmap'
+  ini_file:
+    dest: /etc/globus-connect-server.conf
+    section: Globus
+    option: ClientSecret
+    value: "{{ client_secret }}"
 
-- name: Setup Gridmap CILogon IdP for GCS
+- name: Set [Endpoint].Name
   become: yes
-  lineinfile:
-    path: /etc/globus-connect-server.conf
-    insertafter: '[Security]'
-    regexp: '.*CILogonIdentityProvider =.*'
-    line: 'CILogonIdentityProvider = University of Chicago'
+  ini_file:
+    dest: /etc/globus-connect-server.conf
+    section: Endpoint
+    option: Name
+    value: "{{ endpoint_name }}"
 
-- name: Setup Globus Connect Server
+- name: Set [Endpoint].ServerName
   become: yes
-  command: /usr/bin/globus-connect-server-setup
-  environment:
-    GLOBUS_USER: "{{ globus_id_user }}"
-    GLOBUS_PASSWORD: "{{ globus_id_pass }}"
-    SHORT_HOSTNAME: "{{ endpoint_name }}"
-  args:
-    creates: /var/lib/globus-connect-server/
+  ini_file:
+    dest: /etc/globus-connect-server.conf
+    section: Endpoint
+    option: ServerName
+    value: "{{ public_interface }}"
 
-- name: Add globus-ceph service user
+- name: Set [LetsEncrypt].Email
   become: yes
-  user:
-    name: globus-ceph
-    comment: Globus Ceph
-    system: yes
-    password_lock: yes
+  ini_file:
+    dest: /etc/globus-connect-server.conf
+    section: LetsEncrypt
+    option: Email
+    value: "{{ admin_email }}"
 
-- name: Add gridftp radosgw account
+- name: Set [LetsEncrypt].AgreeToS
+  become: yes
+  ini_file:
+    dest: /etc/globus-connect-server.conf
+    section: LetsEncrypt
+    option: AgreeToS
+    value: "True"
+
+- name: Workaround for httpd to talk to Ceph on localhost
+  become: yes
+  command: setsebool httpd_can_network_connect true
+
+- name: Add Globus radosgw account
   become: yes
   run_once: true
-  shell: radosgw-admin user create --uid=gridftp --display-name "GridFTP Ceph DSI" --caps="users=read"
+  command: radosgw-admin user create --uid="{{ ceph_federated_s3_user }}" --display-name "Federated S3 Gateway" --caps="users=read"
   register: rgw_output
 
-- name: set host_name in /etc/globus/globus-gridftp-server-ceph.conf
+#
+# If globus-connect-server-config endpoint show fails, assume setup needs to be run
+#
+- name: Check if endpoint has already been setup
   become: yes
-  lineinfile:
-    path: /etc/globus/globus-gridftp-server-ceph.conf
-    regexp: '.*host_name =.*'
-    line: "host_name = localhost:3000"
+  command: /sbin/globus-connect-server-config endpoint show
+  register: config_endpoint
+  ignore_errors: True
 
-- name: set use_https = false in /etc/globus/globus-gridftp-server-ceph.conf
+#
+# Run setup only when 'config endpoint' failed
+#
+- name: Setup Globus Connect Server
   become: yes
-  lineinfile:
-    path: /etc/globus/globus-gridftp-server-ceph.conf
-    regexp: '.*use_https =.*'
-    line: "use_https = false"
+  command: /sbin/globus-connect-server-setup
+  register: setup_run
+  when: config_endpoint is failed
 
-- name: set admin_access_key in /etc/globus/globus-gridftp-server-ceph.conf
+#
+# Only run `config endpoint admin show` if setup was not run this iteration
+#
+- name: Checking if "{{ endpoint_admin }}" is an endpoint administrator
   become: yes
-  vars:
-    key: "{{ (rgw_output.stdout | from_json)['keys'][0].access_key }}"
-  lineinfile:
-    path: /etc/globus/globus-gridftp-server-ceph.conf
-    regexp: '.*ceph_rgw_admin_access_key_id =.*'
-    line: "ceph_rgw_admin_access_key_id = {{ key }}"
+  register: admin_list
+  command: /sbin/globus-connect-server-config endpoint admin show
+  when: setup_run is skipped
 
-- name: set admin_secret_key in /etc/globus/globus-gridftp-server-ceph.conf
+#
+# Only add the admin role if it is not already present
+#
+- name: Add "{{ endpoint_admin }}" as an endpoint administrator
   become: yes
-  vars:
-    key: "{{ (rgw_output.stdout | from_json)['keys'][0].secret_key }}"
-  lineinfile:
-    path: /etc/globus/globus-gridftp-server-ceph.conf
-    regexp: '.*ceph_rgw_admin_secret_access_key =.*'
-    line: "ceph_rgw_admin_secret_access_key = {{ key }}"
+  command: /sbin/globus-connect-server-config endpoint admin add-role "{{ endpoint_admin }}"
+  when: setup_run is skipped and item not in admin_list.stdout_lines
+  with_items:
+    - "administrator | identity | {{ endpoint_admin }}"
 
-- name: Edit /etc/gridftp.d/gridftp-ceph
+#
+# Only run `storage-gateway list` if setup was not run this iteration
+#
+- name: Checking if Ceph Storage Gateway has been configured
   become: yes
-  blockinfile:
-    path: /etc/gridftp.d/gridftp-ceph
-    create: yes
-    mode: 0644
-    block: |
-      threads 2
-      load_dsi_module ceph
-      process_user globus-ceph
+  register: gw_list
+  command: /sbin/globus-connect-server-config storage-gateway list
+  when: setup_run is skipped
 
-- name: Reload the GridFTP service
+#
+# Only add the gateway if it does not already exist
+#
+- name: Add the Ceph Storage Gateway
   become: yes
-  service:
-    name: globus-gridftp-server
-    state: reloaded
+  command: /sbin/globus-connect-server-config storage-gateway create --connector Ceph --ceph-admin-key-id "{{ (rgw_output.stdout | from_json)['keys'][0].access_key }}" --ceph-admin-secret-key "{{ (rgw_output.stdout | from_json)['keys'][0].secret_key }}" --display-name "Ceph Storage Gateway" --domain "{{ idp_domain }}" --root / --s3-endpoint "{{ ceph_url }}"
+  when: gw_list is succeeded and item is not search(' \| Ceph \| Ceph Storage Gateway \| /')
+  with_items:
+    - "{{ gw_list.stdout }}"
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
