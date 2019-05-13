@@ -116,38 +116,6 @@
 - name: Add the Ceph Storage Gateway
   become: yes
   command: /sbin/globus-connect-server-config storage-gateway create --connector Ceph --ceph-admin-key-id "{{ (rgw_output.stdout | from_json)['keys'][0].access_key }}" --ceph-admin-secret-key "{{ (rgw_output.stdout | from_json)['keys'][0].secret_key }}" --display-name "Ceph Storage Gateway" --domain "{{ idp_domain }}" --root / --s3-endpoint "{{ ceph_url }}"
-  when: gw_list is succeeded and item is not search(' \| Ceph \| Ceph Storage Gateway \| /')
+  when: setup_run is skipped and gw_list is succeeded and item is not search(' \| Ceph \| Ceph Storage Gateway \| /')
   with_items:
     - "{{ gw_list.stdout }}"
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
