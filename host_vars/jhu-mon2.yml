@@ -1,4 +1,8 @@
 ---
 dummy:
 
+#
+# This is the public (DMZ) interface on the monitor node that Globus Connect
+# Server will use for GridFTP and HTTP transfers.
+#
 public_interface: osn-mon2-dmz.idies.jhu.edu

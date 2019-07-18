@@ -1,8 +1,6 @@
 if [ `hostname` == "citadel" ]
 then
-	for h in jhu-mon1   \
-	         jhu-mon2   \
-	         jhu-mon3
+	for h in jhu-mon1
 	do
 		scp -i ~/.ssh/osn-ansible reset $h:.
 		ssh -i ~/.ssh/osn-ansible $h sudo --login bash /home/ansible/reset
@@ -10,13 +8,20 @@ then
 	return 0
 fi
 
-radosgw-admin user rm --uid=federated_s3
-/usr/sbin/globus-connect-server-cleanup
-sudo systemctl stop httpd.service
-yum remove -y globus*
+echo "######################### ${HOSTNAME} #################################"
+
+if [ `hostname` == "osn-jhu-mon1" ]
+then
+	sudo /sbin/globus-connect-server-cleanup --force --delete
+fi
+
+radosgw-admin user rm --uid=globus_admin
+systemctl stop httpd.service
+yum remove -y globus* mod-globus
 # Remove GCS RPM repository key
 rpm -e gpg-pubkey-faf24365-4d0f5d09
 userdel --remove gcsweb
+userdel --remove osn
 rm -rf /var/lib/globus-connect-server
 rm -rf /etc/httpd/conf.d/gcs_manager*
 rpm -e mod_auth_openidc
@@ -26,3 +31,4 @@ rm -rf /etc/globus-connect-server.conf.rpmsave \
        /etc/grid-security
 
 rm -rf /var/log/globus-connect-server
+rm -rf /opt/globus

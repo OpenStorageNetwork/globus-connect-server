@@ -1,5 +1,5 @@
 ---
-- hosts: ~.*-mon1.*:&ceph
+- hosts: ~.*-mon2.*:&ceph
   roles:
-  - globus-gcs
+  - globus-connect-server
 
