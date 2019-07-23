@@ -3,6 +3,7 @@
   yum:
     name: https://dl.fedoraproject.org/pub/epel/epel-release-latest-7.noarch.rpm
     state: present
+    disablerepo: osn-custom,rhel7-server,rhel7-updates
 
 - name: install GCS RPM repository key
   rpm_key:
@@ -12,6 +13,7 @@
   yum:
     name: http://downloads.globus.org/toolkit/gt6/stable/installers/repo/rpm/globus-toolkit-repo-latest.noarch.rpm
     state: present
+    disablerepo: osn-custom,rhel7-server,rhel7-updates
 
 - name: Enable Globus-Connect-Server-5-Stable
   ini_file:
@@ -31,3 +33,4 @@
   yum:
     name: [ 'globus-connect-server52' ]
     state: present
+    disablerepo: osn-custom,rhel7-server,rhel7-updates

@@ -4,25 +4,43 @@
 dummy:
 
 #
-# Globus Auth client ID
+# Email of the admin responsible for this GCS installation. This value is
+# used to register for the LetsEncrypt SSL certificate(s) pulled during
+# installation.
 #
-client_id: bd30e780-7aff-43f3-b58c-61090ea56317
-
-#
-# Globus ID password associated with globus_id_user
-#
-client_secret: !vault |
-          $ANSIBLE_VAULT;1.1;AES256
-          64643939613861393064383838343334336536653963303130383664373730393532656533373935
-          6631343234393030373065313033393861336166663233320a613134653137316633646339663962
-          63613230316365623436373966346436306132393130643535663635333337346438306166373064
-          3965366230353132660a393663323333343439666233376334326366396231383566646561346464
-          38333639323236646432656532323039396566613939363166623736653433326432363636366365
-          3361386166623631643432633335666432313831656263653135
-
 admin_email: jasonalt@globus.org
 
+#
+# All users who access this POD, other than anonymous access, must have an
+# acocunt from this domain linked with home institution account.
+#
 idp_domain: globusid.org
+
+#
+# This user is granted the 'endpoint manager' role during installation. This
+# allows the shared Globus account 'osn@globusid.org' to manage all OSN 
+# endpoints via the Globus Web and CLI interfaces.
+#
 endpoint_admin: osn@globusid.org
+
+#
+# Location of Ceph RadosGW. SSL is not necessary if the service runs locally.
+# Ideally, have one radosgw and Globus Connect Server pair per monitor node.
 ceph_url: http://localhost:3000
-ceph_federated_s3_user: federated_s3
+
+#
+# This is an administrative account created on the Ceph cluster during
+# installation. Globus Connect Server uses this account to query Ceph
+# for available Ceph accounts when Globus is determing how to map a user's home
+# institution credential to a ceph account.
+#
+globus_admin_user: globus_admin
+
+#
+# List of accounts from 'idp_domain' listed above that are allowed to create
+# Globus collections in Ceph. To simplify deployment and keep account management
+# minimal, limit the number of users listed in. Then configure a collection to
+# permit additional users via the globus.org web interface or CLI.
+# These users must already exist in Ceph, this playbook will not create these
+# accounts.
+ceph_allowed_users: osn

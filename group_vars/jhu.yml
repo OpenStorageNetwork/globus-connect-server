@@ -3,4 +3,17 @@
 # This keeps ansible from complaining if no other variables are defined
 dummy:
 
+#
+# Use the format <site>.osn (ex. jhu.osn)
+#
 endpoint_name: jhu.osn
+
+#
+# Globus Auth client ID
+#
+client_id: <paste client id>
+
+#
+# Globus ID password associated with globus_id_user
+#
+client_secret: <paste client secret>

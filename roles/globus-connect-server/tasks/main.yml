@@ -1,6 +1,5 @@
 ---
 
-# Set Firewall rules
 - name: install GCS packages
   become: yes
   become_flags: --login
@@ -61,7 +60,7 @@
 - name: Add Globus radosgw account
   become: yes
   run_once: true
-  command: radosgw-admin user create --uid="{{ ceph_federated_s3_user }}" --display-name "Federated S3 Gateway" --caps="users=read"
+  command: radosgw-admin user create --uid="{{ globus_admin_user }}" --display-name "Globus Admin User" --caps="users=read"
   register: rgw_output
 
 #
@@ -115,7 +114,7 @@
 #
 - name: Add the Ceph Storage Gateway
   become: yes
-  command: /sbin/globus-connect-server-config storage-gateway create --connector Ceph --ceph-admin-key-id "{{ (rgw_output.stdout | from_json)['keys'][0].access_key }}" --ceph-admin-secret-key "{{ (rgw_output.stdout | from_json)['keys'][0].secret_key }}" --display-name "Ceph Storage Gateway" --domain "{{ idp_domain }}" --root / --s3-endpoint "{{ ceph_url }}"
+  command: /sbin/globus-connect-server-config storage-gateway create --connector Ceph --ceph-admin-key-id "{{ (rgw_output.stdout | from_json)['keys'][0].access_key }}" --ceph-admin-secret-key "{{ (rgw_output.stdout | from_json)['keys'][0].secret_key }}" --display-name "Ceph Storage Gateway" --domain "{{ idp_domain }}" --root / --s3-endpoint "{{ ceph_url }}" --users-allow "{{ ceph_allowed_users }}"
   when: setup_run is skipped and gw_list is succeeded and item is not search(' \| Ceph \| Ceph Storage Gateway \| /')
   with_items:
     - "{{ gw_list.stdout }}"
