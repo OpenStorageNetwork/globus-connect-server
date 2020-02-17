@@ -1,4 +1,4 @@
-## Project
+## Project: Installing Globus Connect Server onto an OSN Pod
 This project provides an Ansible playbook for the installation of Globus
 Connect Server (GCS) v5 onto an OSN pod. This effort provides the top layer
 of a functional OSN data stack for use in the OSN pilot phase. It was derived
